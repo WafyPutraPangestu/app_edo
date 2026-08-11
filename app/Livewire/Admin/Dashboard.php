@@ -6,10 +6,21 @@ use App\Models\ReleaseRequest;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\Carbon;
+use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+#[Layout('layouts.app')]
 class Dashboard extends Component
 {
+    public int $chartMonth;
+    public int $chartYear;
+
+    public function mount(): void
+    {
+        $this->chartMonth = (int) now()->month;
+        $this->chartYear  = (int) now()->year;
+    }
+
     public function render()
     {
         // ── Kartu Statistik Utama ──────────────────────────────
@@ -36,24 +47,30 @@ class Dashboard extends Component
             ? round((($revenueThisMonth - $revenueLastMonth) / $revenueLastMonth) * 100, 1)
             : ($revenueThisMonth > 0 ? 100 : 0);
 
-        // ── Tren Pendapatan 6 Bulan Terakhir (Line Chart) ──────
-        $months = collect(range(5, 0))->map(fn($i) => now()->subMonths($i)->format('Y-m'));
+        // ── Chart: Pendapatan Harian (bulan & tahun terpilih) ──────
+        $startOfMonth = Carbon::create($this->chartYear, $this->chartMonth, 1)->startOfMonth();
+        $endOfMonth   = $startOfMonth->copy()->endOfMonth();
+        $daysInMonth  = $startOfMonth->daysInMonth;
+        $dayNumbers   = collect(range(1, $daysInMonth));
 
-        $rawRevenue = Transaction::where('status', 'paid')
-            ->where('payment_date', '>=', now()->subMonths(5)->startOfMonth())
-            ->selectRaw("DATE_FORMAT(payment_date, '%Y-%m') as ym, SUM(total_amount) as total")
-            ->groupBy('ym')
-            ->pluck('total', 'ym');
+        $rawDailyRevenue = Transaction::where('status', 'paid')
+            ->whereBetween('payment_date', [$startOfMonth, $endOfMonth])
+            ->selectRaw('DAY(payment_date) as d, SUM(total_amount) as total')
+            ->groupBy('d')
+            ->pluck('total', 'd');
 
-        $chartLabels = $months->map(fn($m) => Carbon::createFromFormat('Y-m', $m)->format('M Y'))->values();
-        $chartRevenue = $months->map(fn($m) => (float) ($rawRevenue[$m] ?? 0))->values();
+        $chartLabels  = $dayNumbers->values();
+        $chartRevenue = $dayNumbers->map(fn($d) => (float) ($rawDailyRevenue[$d] ?? 0))->values();
 
-        // ── Distribusi Status Pengajuan (Doughnut Chart) ───────
-        $statusBreakdown = [
-            'Pending'  => $pendingReview,
-            'Approved' => $approvedCount,
-            'Rejected' => $rejectedCount,
-        ];
+        // ── Chart: Pengajuan Masuk Harian ──────
+        $rawDailyRequests = ReleaseRequest::whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->selectRaw('DAY(created_at) as d, COUNT(*) as total')
+            ->groupBy('d')
+            ->pluck('total', 'd');
+
+        $chartRequests = $dayNumbers->map(fn($d) => (int) ($rawDailyRequests[$d] ?? 0))->values();
+
+        $chartMonthName = $startOfMonth->translatedFormat('F Y');
 
         // ── Distribusi Metode Pembayaran (Bar Chart) ───────────
         $paymentMethods = Transaction::where('status', 'paid')
@@ -67,19 +84,20 @@ class Dashboard extends Component
         $recentTransactions = Transaction::with('user')->latest()->limit(6)->get();
 
         return view('livewire.admin.dashboard', [
-            'totalPengajuan'    => $totalPengajuan,
-            'pendingReview'     => $pendingReview,
-            'approvedCount'     => $approvedCount,
-            'rejectedCount'     => $rejectedCount,
-            'totalRevenue'      => $totalRevenue,
-            'unpaidAmount'      => $unpaidAmount,
-            'totalClients'      => $totalClients,
-            'revenueGrowth'     => $revenueGrowth,
-            'chartLabels'       => $chartLabels,
-            'chartRevenue'      => $chartRevenue,
-            'statusBreakdown'   => $statusBreakdown,
-            'paymentMethods'    => $paymentMethods,
-            'recentRequests'    => $recentRequests,
+            'totalPengajuan'     => $totalPengajuan,
+            'pendingReview'      => $pendingReview,
+            'approvedCount'      => $approvedCount,
+            'rejectedCount'      => $rejectedCount,
+            'totalRevenue'       => $totalRevenue,
+            'unpaidAmount'       => $unpaidAmount,
+            'totalClients'       => $totalClients,
+            'revenueGrowth'      => $revenueGrowth,
+            'chartLabels'        => $chartLabels,
+            'chartRevenue'       => $chartRevenue,
+            'chartRequests'      => $chartRequests,
+            'chartMonthName'     => $chartMonthName,
+            'paymentMethods'     => $paymentMethods,
+            'recentRequests'     => $recentRequests,
             'recentTransactions' => $recentTransactions,
         ]);
     }

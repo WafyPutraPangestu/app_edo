@@ -20,29 +20,29 @@
     {{-- ══════════════ STAT CARDS ══════════════ --}}
     <div class="av-grid-stats mb-6">
 
-        <div class="av-stat-card">
+        <a href="{{ route('admin.verifikasi.index', ['filter' => 'all']) }}" class="av-stat-card transition-transform duration-200 hover:scale-[1.03] cursor-pointer" wire:navigate>
             <div class="av-stat-icon av-stat-icon--blue">📄</div>
             <div class="av-stat-value">{{ number_format($totalPengajuan) }}</div>
             <div class="av-stat-label">Total Pengajuan</div>
-        </div>
+        </a>
 
-        <div class="av-stat-card">
+        <a href="{{ route('admin.verifikasi.index', ['filter' => 'pending']) }}" class="av-stat-card transition-transform duration-200 hover:scale-[1.03] cursor-pointer" wire:navigate>
             <div class="av-stat-icon av-stat-icon--amber">⏳</div>
             <div class="av-stat-value">{{ number_format($pendingReview) }}</div>
             <div class="av-stat-label">Menunggu Verifikasi</div>
-        </div>
+        </a>
 
-        <div class="av-stat-card">
+        <a href="{{ route('admin.verifikasi.index', ['filter' => 'approved_unpaid']) }}" class="av-stat-card transition-transform duration-200 hover:scale-[1.03] cursor-pointer" wire:navigate>
             <div class="av-stat-icon av-stat-icon--green">✅</div>
             <div class="av-stat-value">{{ number_format($approvedCount) }}</div>
             <div class="av-stat-label">Disetujui</div>
-        </div>
+        </a>
 
-        <div class="av-stat-card">
+        <a href="{{ route('admin.verifikasi.index', ['filter' => 'rejected']) }}" class="av-stat-card transition-transform duration-200 hover:scale-[1.03] cursor-pointer" wire:navigate>
             <div class="av-stat-icon av-stat-icon--red">✕</div>
             <div class="av-stat-value">{{ number_format($rejectedCount) }}</div>
             <div class="av-stat-label">Ditolak</div>
-        </div>
+        </a>
 
         <div class="av-stat-card">
             <div class="av-stat-icon av-stat-icon--green">💰</div>
@@ -59,63 +59,87 @@
             <div class="av-stat-label">Tagihan Belum Dibayar</div>
         </div>
 
-        <div class="av-stat-card">
+        <a href="{{ route('admin.client.index') }}" class="av-stat-card transition-transform duration-200 hover:scale-[1.03] cursor-pointer" wire:navigate>
             <div class="av-stat-icon av-stat-icon--blue">👤</div>
             <div class="av-stat-value">{{ number_format($totalClients) }}</div>
             <div class="av-stat-label">Total Klien Terdaftar</div>
-        </div>
+        </a>
 
+    </div>
+
+    {{-- ══════════════ CHART FILTER ══════════════ --}}
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+        <span class="text-sm font-medium text-secondary">📊 Periode Chart:</span>
+        <select wire:model.live="chartMonth"
+                class="av-select text-sm rounded-lg px-3 py-1.5 bg-[#1e293b] border border-white/10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition [&>option]:bg-[#1e293b] [&>option]:text-white">
+            @for ($m = 1; $m <= 12; $m++)
+                <option value="{{ $m }}">{{ \Carbon\Carbon::create()->month($m)->translatedFormat('F') }}</option>
+            @endfor
+        </select>
+        <select wire:model.live="chartYear"
+                class="av-select text-sm rounded-lg px-3 py-1.5 bg-[#1e293b] border border-white/10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition [&>option]:bg-[#1e293b] [&>option]:text-white">
+            @for ($y = now()->year; $y >= now()->year - 4; $y--)
+                <option value="{{ $y }}">{{ $y }}</option>
+            @endfor
+        </select>
+        <span class="ml-auto av-pill av-pill--blue text-xs">{{ $chartMonthName }}</span>
     </div>
 
     {{-- ══════════════ CHARTS ══════════════ --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
 
-        {{-- Revenue trend --}}
-        <div class="av-card lg:col-span-2">
-            <div class="av-card-header">
-                <span class="av-card-title">Tren Pendapatan (6 Bulan Terakhir)</span>
-                <span class="av-badge av-badge--blue">Realtime</span>
+        {{-- Revenue trend (area) — 3/5 width --}}
+        <div class="av-card lg:col-span-3 overflow-hidden relative" wire:key="rev-{{ $chartMonth }}-{{ $chartYear }}">
+            <div class="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none"></div>
+            <div class="av-card-header relative z-10">
+                <div>
+                    <span class="av-card-title">Pendapatan Harian</span>
+                    <p class="text-xs text-muted mt-0.5">Total pendapatan per hari — {{ $chartMonthName }}</p>
+                </div>
+                <span class="av-badge av-badge--blue text-xs">
+                    Rp{{ number_format(collect($chartRevenue)->sum(), 0, ',', '.') }}
+                </span>
             </div>
-            <div class="av-card-body">
-                <div x-data="revenueChart(@js($chartLabels), @js($chartRevenue))" x-init="init()" wire:ignore style="height: 260px;">
+            <div class="av-card-body relative z-10">
+                <div x-data="revenueAreaChart(@js($chartLabels), @js($chartRevenue))" x-init="init()" style="height: 280px;">
                     <canvas x-ref="canvas"></canvas>
                 </div>
             </div>
         </div>
 
-        {{-- Status breakdown --}}
-        <div class="av-card">
-            <div class="av-card-header">
-                <span class="av-card-title">Status Pengajuan</span>
-            </div>
-            <div class="av-card-body">
-                <div x-data="statusChart(@js(array_keys($statusBreakdown)), @js(array_values($statusBreakdown)))" x-init="init()" wire:ignore style="height: 220px;">
-                    <canvas x-ref="canvas"></canvas>
+        {{-- Daily requests (bar) — 2/5 width --}}
+        <div class="av-card lg:col-span-2 overflow-hidden relative" wire:key="req-{{ $chartMonth }}-{{ $chartYear }}">
+            <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none"></div>
+            <div class="av-card-header relative z-10">
+                <div>
+                    <span class="av-card-title">Pengajuan Masuk</span>
+                    <p class="text-xs text-muted mt-0.5">Jumlah pengajuan per hari</p>
                 </div>
-                <div class="flex justify-center gap-4 mt-4 text-xs">
-                    <span class="flex items-center gap-1.5 text-secondary">
-                        <span class="inline-block w-2 h-2 rounded-full" style="background:#f59e0b"></span> Pending
-                    </span>
-                    <span class="flex items-center gap-1.5 text-secondary">
-                        <span class="inline-block w-2 h-2 rounded-full" style="background:#10b981"></span> Approved
-                    </span>
-                    <span class="flex items-center gap-1.5 text-secondary">
-                        <span class="inline-block w-2 h-2 rounded-full" style="background:#ef4444"></span> Rejected
-                    </span>
+                <span class="av-badge av-badge--green text-xs">
+                    {{ collect($chartRequests)->sum() }} total
+                </span>
+            </div>
+            <div class="av-card-body relative z-10">
+                <div x-data="requestsBarChart(@js($chartLabels), @js($chartRequests))" x-init="init()" style="height: 280px;">
+                    <canvas x-ref="canvas"></canvas>
                 </div>
             </div>
         </div>
 
     </div>
 
-    {{-- Payment methods bar chart --}}
+    {{-- Payment methods --}}
     @if ($paymentMethods->count())
-        <div class="av-card mb-6">
-            <div class="av-card-header">
-                <span class="av-card-title">Distribusi Metode Pembayaran</span>
+        <div class="av-card mb-6 overflow-hidden relative">
+            <div class="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent pointer-events-none"></div>
+            <div class="av-card-header relative z-10">
+                <div>
+                    <span class="av-card-title">Metode Pembayaran</span>
+                    <p class="text-xs text-muted mt-0.5">Distribusi metode pembayaran yang digunakan klien</p>
+                </div>
             </div>
-            <div class="av-card-body">
-                <div x-data="paymentChart(@js(array_keys($paymentMethods->toArray())), @js(array_values($paymentMethods->toArray())))" x-init="init()" wire:ignore style="height: 200px;">
+            <div class="av-card-body relative z-10">
+                <div x-data="paymentBarChart(@js(array_keys($paymentMethods->toArray())), @js(array_values($paymentMethods->toArray())))" x-init="init()" wire:ignore style="height: 200px;">
                     <canvas x-ref="canvas"></canvas>
                 </div>
             </div>
@@ -135,7 +159,7 @@
                     Transaksi Terbaru
                 </button>
             </div>
-            <a href="#" class="av-btn av-btn--ghost av-btn--sm">
+            <a href="{{ route('admin.riwayat.index') }}" class="av-btn av-btn--ghost av-btn--sm" wire:navigate>
                 Lihat Semua →
             </a>
         </div>
@@ -243,58 +267,101 @@
 {{-- ══════════════ ALPINE CHART FACTORIES ══════════════ --}}
 @once
     <script>
-        function aeroChartDefaults() {
-            return {
-                color: '#94a3b8',
-                grid: 'rgba(148, 163, 184, 0.08)',
-            };
-        }
-
         document.addEventListener('alpine:init', () => {
-            Alpine.data('revenueChart', (labels, data) => ({
+
+            /* ── Shared helpers ─────────────────────────────── */
+            const fontStack = "'Inter', 'Segoe UI', system-ui, sans-serif";
+            const tooltipStyle = {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleFont: { family: fontStack, size: 13, weight: '600' },
+                bodyFont:  { family: fontStack, size: 12 },
+                padding: { top: 10, bottom: 10, left: 14, right: 14 },
+                cornerRadius: 10,
+                borderColor: 'rgba(99, 102, 241, 0.25)',
+                borderWidth: 1,
+                displayColors: false,
+                caretSize: 6,
+            };
+            const gridColor = 'rgba(148, 163, 184, 0.07)';
+            const tickColor = '#64748b';
+
+            /* ── Revenue Area Chart ─────────────────────────── */
+            Alpine.data('revenueAreaChart', (labels, data) => ({
                 chart: null,
                 init() {
-                    const d = aeroChartDefaults();
-                    this.chart = new Chart(this.$refs.canvas, {
+                    const ctx = this.$refs.canvas.getContext('2d');
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+                    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.35)');
+                    gradient.addColorStop(0.5, 'rgba(59, 130, 246, 0.08)');
+                    gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+                    this.chart = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: labels,
+                            labels,
                             datasets: [{
                                 label: 'Pendapatan',
-                                data: data,
-                                borderColor: '#2563eb',
-                                backgroundColor: 'rgba(37, 99, 235, 0.15)',
+                                data,
+                                borderColor: '#3b82f6',
+                                backgroundColor: gradient,
                                 fill: true,
-                                tension: 0.35,
-                                pointRadius: 3,
-                                pointBackgroundColor: '#3b82f6',
+                                tension: 0.4,
+                                borderWidth: 2.5,
+                                pointRadius: 0,
+                                pointHitRadius: 20,
+                                pointHoverRadius: 6,
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: '#3b82f6',
+                                pointHoverBorderWidth: 3,
                             }],
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            animation: {
+                                duration: 1200,
+                                easing: 'easeInOutQuart',
+                                delay(ctx) { return ctx.dataIndex * 30; },
+                            },
                             plugins: {
-                                legend: {
-                                    display: false
-                                }
+                                legend: { display: false },
+                                tooltip: {
+                                    ...tooltipStyle,
+                                    callbacks: {
+                                        title: (items) => 'Tanggal ' + items[0].label,
+                                        label: (item) => 'Rp ' + new Intl.NumberFormat('id-ID').format(item.raw),
+                                    },
+                                },
                             },
                             scales: {
                                 x: {
                                     ticks: {
-                                        color: d.color
+                                        color: tickColor,
+                                        font: { family: fontStack, size: 11 },
+                                        maxRotation: 0,
+                                        callback(val, i) {
+                                            const lbl = this.getLabelForValue(val);
+                                            return (lbl % 5 === 0 || lbl === 1) ? lbl : '';
+                                        },
                                     },
-                                    grid: {
-                                        color: 'transparent'
-                                    }
+                                    grid: { display: false },
+                                    border: { display: false },
                                 },
                                 y: {
+                                    beginAtZero: true,
                                     ticks: {
-                                        color: d.color,
-                                        callback: (v) => 'Rp' + (v / 1000000).toFixed(1) + 'jt',
+                                        color: tickColor,
+                                        font: { family: fontStack, size: 11 },
+                                        callback: (v) => {
+                                            if (v >= 1_000_000) return 'Rp' + (v / 1_000_000).toFixed(1) + 'jt';
+                                            if (v >= 1_000) return 'Rp' + (v / 1_000).toFixed(0) + 'rb';
+                                            return 'Rp' + v;
+                                        },
+                                        maxTicksLimit: 6,
                                     },
-                                    grid: {
-                                        color: d.grid
-                                    },
+                                    grid: { color: gridColor },
+                                    border: { display: false, dash: [4, 4] },
                                 },
                             },
                         },
@@ -302,81 +369,152 @@
                 },
             }));
 
-            Alpine.data('statusChart', (labels, data) => ({
+            /* ── Requests Bar Chart ─────────────────────────── */
+            Alpine.data('requestsBarChart', (labels, data) => ({
                 chart: null,
                 init() {
-                    this.chart = new Chart(this.$refs.canvas, {
-                        type: 'doughnut',
+                    const ctx = this.$refs.canvas.getContext('2d');
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+                    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.9)');
+                    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.25)');
+
+                    this.chart = new Chart(ctx, {
+                        type: 'bar',
                         data: {
-                            labels: labels,
+                            labels,
                             datasets: [{
-                                data: data,
-                                backgroundColor: ['#f59e0b', '#10b981', '#ef4444'],
-                                borderColor: '#111d35',
-                                borderWidth: 3,
+                                label: 'Pengajuan',
+                                data,
+                                backgroundColor: gradient,
+                                hoverBackgroundColor: '#10b981',
+                                borderRadius: { topLeft: 6, topRight: 6 },
+                                borderSkipped: false,
+                                maxBarThickness: 14,
                             }],
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            cutout: '68%',
+                            interaction: { mode: 'index', intersect: false },
+                            animation: {
+                                duration: 1000,
+                                easing: 'easeOutQuart',
+                                delay(ctx) { return ctx.dataIndex * 20; },
+                            },
                             plugins: {
-                                legend: {
-                                    display: false
-                                }
+                                legend: { display: false },
+                                tooltip: {
+                                    ...tooltipStyle,
+                                    callbacks: {
+                                        title: (items) => 'Tanggal ' + items[0].label,
+                                        label: (item) => item.raw + ' pengajuan',
+                                    },
+                                },
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: tickColor,
+                                        font: { family: fontStack, size: 10 },
+                                        maxRotation: 0,
+                                        callback(val, i) {
+                                            const lbl = this.getLabelForValue(val);
+                                            return (lbl % 5 === 0 || lbl === 1) ? lbl : '';
+                                        },
+                                    },
+                                    grid: { display: false },
+                                    border: { display: false },
+                                },
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: tickColor,
+                                        font: { family: fontStack, size: 11 },
+                                        stepSize: 1,
+                                        maxTicksLimit: 6,
+                                    },
+                                    grid: { color: gridColor },
+                                    border: { display: false },
+                                },
                             },
                         },
                     });
                 },
             }));
 
-            Alpine.data('paymentChart', (labels, data) => ({
+            /* ── Payment Methods Bar Chart ──────────────────── */
+            Alpine.data('paymentBarChart', (labels, data) => ({
                 chart: null,
                 init() {
-                    const d = aeroChartDefaults();
+                    const palette = [
+                        'rgba(99, 102, 241, 0.85)',
+                        'rgba(139, 92, 246, 0.85)',
+                        'rgba(236, 72, 153, 0.85)',
+                        'rgba(14, 165, 233, 0.85)',
+                        'rgba(20, 184, 166, 0.85)',
+                        'rgba(245, 158, 11, 0.85)',
+                    ];
+                    const hoverPalette = [
+                        '#6366f1', '#8b5cf6', '#ec4899', '#0ea5e9', '#14b8a6', '#f59e0b',
+                    ];
+
                     this.chart = new Chart(this.$refs.canvas, {
                         type: 'bar',
                         data: {
-                            labels: labels,
+                            labels: labels.map(l => l.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())),
                             datasets: [{
-                                label: 'Jumlah Transaksi',
-                                data: data,
-                                backgroundColor: '#3b82f6',
-                                borderRadius: 6,
-                                maxBarThickness: 40,
+                                label: 'Transaksi',
+                                data,
+                                backgroundColor: data.map((_, i) => palette[i % palette.length]),
+                                hoverBackgroundColor: data.map((_, i) => hoverPalette[i % hoverPalette.length]),
+                                borderRadius: 8,
+                                maxBarThickness: 50,
+                                borderSkipped: false,
                             }],
                         },
                         options: {
+                            indexAxis: 'y',
                             responsive: true,
                             maintainAspectRatio: false,
+                            animation: {
+                                duration: 1000,
+                                easing: 'easeOutBack',
+                                delay(ctx) { return ctx.dataIndex * 100; },
+                            },
                             plugins: {
-                                legend: {
-                                    display: false
-                                }
+                                legend: { display: false },
+                                tooltip: {
+                                    ...tooltipStyle,
+                                    callbacks: {
+                                        label: (item) => item.raw + ' transaksi',
+                                    },
+                                },
                             },
                             scales: {
                                 x: {
                                     ticks: {
-                                        color: d.color
+                                        color: tickColor,
+                                        font: { family: fontStack, size: 11 },
+                                        stepSize: 1,
                                     },
-                                    grid: {
-                                        color: 'transparent'
-                                    }
+                                    grid: { color: gridColor },
+                                    border: { display: false },
                                 },
                                 y: {
                                     ticks: {
-                                        color: d.color,
-                                        stepSize: 1
+                                        color: '#cbd5e1',
+                                        font: { family: fontStack, size: 12, weight: '500' },
                                     },
-                                    grid: {
-                                        color: d.grid
-                                    }
+                                    grid: { display: false },
+                                    border: { display: false },
                                 },
                             },
                         },
                     });
                 },
             }));
+
         });
     </script>
 @endonce
+

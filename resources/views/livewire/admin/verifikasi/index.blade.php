@@ -160,6 +160,14 @@
                             </div>
                             <div class="av-card-body">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="sm:col-span-2">
+                                        <label class="av-label">No. Invoice</label>
+                                        <input type="text" wire:model="invoice_number" class="av-input"
+                                            placeholder="INV-..." @disabled(!$this->chargesEditable)>
+                                        @error('invoice_number')
+                                            <div class="av-field-error">{{ $message }}</div>
+                                        @enderror
+                                    </div>
                                     <div>
                                         <label class="av-label">Nomor AWB</label>
                                         <input type="text" wire:model="awb_number" class="av-input"

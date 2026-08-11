@@ -25,6 +25,7 @@ class Index extends Component
     public ?ReleaseRequest $selected = null;
 
     // ── Form: detail kargo (dipakai saat verifikasi) ──
+    public ?string $invoice_number = null;
     public ?string $awb_number = null;
     public ?string $flight_number = null;
     public ?string $origin = null;
@@ -46,6 +47,13 @@ class Index extends Component
 
     public function mount(): void
     {
+        $allowed = ['all', 'pending', 'approved_unpaid', 'awaiting_awb', 'done', 'rejected'];
+        $filter = request()->query('filter');
+
+        if ($filter && in_array($filter, $allowed)) {
+            $this->listFilter = $filter;
+        }
+
         $this->resetChargeRows();
     }
 
@@ -81,8 +89,8 @@ class Index extends Component
             return false;
         }
 
-        return $this->selected->status === 'pending'
-            || ($this->selected->status === 'approved' && !$this->selected->transaction);
+        return in_array($this->selected->status, ['pending', 'approved']) 
+            && (!$this->selected->transaction || empty($this->selected->transaction->snap_token));
     }
 
     public function selectRequest(int $id): void
@@ -112,6 +120,12 @@ class Index extends Component
         $this->awb_number = $this->selected->awb_number;
         $this->flight_number = $this->selected->flight_number;
         $this->origin = $this->selected->origin;
+
+        if ($this->selected->transaction) {
+            $this->invoice_number = $this->selected->transaction->invoice_number;
+        } else {
+            $this->invoice_number = 'INV-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(6));
+        }
         $this->destination = $this->selected->destination;
         $this->quantity = $this->selected->quantity;
         $this->gross_weight = $this->selected->gross_weight;
@@ -162,7 +176,10 @@ class Index extends Component
             return;
         }
 
+        $transactionId = $this->selected->transaction ? $this->selected->transaction->id : 'NULL';
+
         $this->validate([
+            'invoice_number' => 'required|string|max:100|unique:transactions,invoice_number,' . $transactionId,
             'awb_number' => 'required|string|max:100',
             'flight_number' => 'required|string|max:50',
             'origin' => 'required|string|max:100',
@@ -174,6 +191,7 @@ class Index extends Component
             'charges.*.local_charge_id' => 'required|exists:local_charges,id',
             'charges.*.amount' => 'required|numeric|min:0',
         ], [], [
+            'invoice_number' => 'No. Invoice',
             'awb_number' => 'Nomor AWB',
             'flight_number' => 'Nomor penerbangan',
             'origin' => 'Asal',
@@ -203,6 +221,22 @@ class Index extends Component
                 $this->selected->requestCharges()->create([
                     'local_charge_id' => $row['local_charge_id'],
                     'amount' => $row['amount'],
+                ]);
+            }
+
+            $totalAmount = collect($this->charges)->sum('amount');
+            if ($this->selected->transaction) {
+                $this->selected->transaction->update([
+                    'invoice_number' => $this->invoice_number,
+                    'total_amount' => $totalAmount,
+                    'snap_token' => null,
+                ]);
+            } else {
+                $this->selected->transaction()->create([
+                    'user_id' => $this->selected->user_id,
+                    'invoice_number' => $this->invoice_number,
+                    'total_amount' => $totalAmount,
+                    'status' => 'unpaid',
                 ]);
             }
         });
