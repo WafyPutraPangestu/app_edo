@@ -185,12 +185,12 @@
                                         Unduh e-DO
                                     </a>
                                 @elseif($req->transaction && $req->transaction->status === 'unpaid')
-                                    <a href="{{ route('client.transactions.pay', $req->transaction->id) }}"
+                                    <a href="{{ route('client.tagihan.bayar', $req->transaction->id) }}"
                                         class="av-btn av-btn--amber av-btn--sm">
                                         Bayar
                                     </a>
                                 @else
-                                    <a href="{{ route('client.release-requests.show', $req->id) }}"
+                                    <a href="{{ route('client.pengajuan.show', $req->id) }}"
                                         class="av-btn av-btn--ghost av-btn--sm">
                                         Detail
                                     </a>
